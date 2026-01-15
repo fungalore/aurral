@@ -9,6 +9,27 @@ import { JSONFile } from "lowdb/node";
 
 dotenv.config();
 
+const GENRE_KEYWORDS = [
+  "rock",
+  "pop",
+  "electronic",
+  "metal",
+  "jazz",
+  "hip-hop",
+  "indie",
+  "alternative",
+  "punk",
+  "soul",
+  "r&b",
+  "folk",
+  "classical",
+  "blues",
+  "country",
+  "reggae",
+  "disco",
+  "funk",
+];
+
 const defaultData = {
   discovery: {
     recommendations: [],
@@ -681,12 +702,16 @@ const updateDiscoveryCache = async () => {
 
   try {
     const lidarrArtists = await getCachedLidarrArtists(true);
+    console.log(`Found ${lidarrArtists.length} artists in Lidarr.`);
 
     const existingArtistIds = new Set(
       lidarrArtists.map((a) => a.foreignArtistId),
     );
 
     if (lidarrArtists.length === 0 && !LASTFM_API_KEY) {
+      console.log(
+        "No artists in Lidarr and no Last.fm key. Skipping discovery.",
+      );
       discoveryCache.isUpdating = false;
       return;
     }
@@ -695,9 +720,12 @@ const updateDiscoveryCache = async () => {
     const genreCounts = new Map();
     const profileSample = [...lidarrArtists]
       .sort(() => 0.5 - Math.random())
-      .slice(0, 15);
+      .slice(0, 25);
+
+    console.log(`Sampling tags/genres from ${profileSample.length} artists...`);
 
     for (const artist of profileSample) {
+      let foundTags = false;
       if (LASTFM_API_KEY) {
         try {
           const data = await lastfmRequest("artist.getTopTags", {
@@ -707,61 +735,71 @@ const updateDiscoveryCache = async () => {
             const tags = Array.isArray(data.toptags.tag)
               ? data.toptags.tag
               : [data.toptags.tag];
-            tags.slice(0, 10).forEach((t) => {
+            tags.slice(0, 15).forEach((t) => {
               tagCounts.set(
                 t.name,
                 (tagCounts.get(t.name) || 0) + (parseInt(t.count) || 1),
               );
               const l = t.name.toLowerCase();
-              if (
-                [
-                  "rock",
-                  "pop",
-                  "electronic",
-                  "metal",
-                  "jazz",
-                  "hip-hop",
-                  "indie",
-                  "alternative",
-                  "punk",
-                  "soul",
-                  "r&b",
-                  "folk",
-                ].some((g) => l.includes(g))
-              )
+              if (GENRE_KEYWORDS.some((g) => l.includes(g)))
                 genreCounts.set(t.name, (genreCounts.get(t.name) || 0) + 1);
             });
-            continue;
+            foundTags = true;
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn(
+            `Failed to get Last.fm tags for ${artist.artistName}: ${e.message}`,
+          );
+        }
       }
-      try {
-        const data = await musicbrainzRequest(
-          `/artist/${artist.foreignArtistId}`,
-          { inc: "tags+genres" },
-        );
-        (data.tags || []).forEach((t) =>
-          tagCounts.set(t.name, (tagCounts.get(t.name) || 0) + t.count),
-        );
-        (data.genres || []).forEach((g) =>
-          genreCounts.set(g.name, (genreCounts.get(g.name) || 0) + g.count),
-        );
-      } catch (e) {}
+
+      if (!foundTags) {
+        try {
+          const data = await musicbrainzRequest(
+            `/artist/${artist.foreignArtistId}`,
+            { inc: "tags+genres" },
+          );
+          (data.tags || []).forEach((t) => {
+            tagCounts.set(
+              t.name,
+              (tagCounts.get(t.name) || 0) + (t.count || 1),
+            );
+            const l = t.name.toLowerCase();
+            if (GENRE_KEYWORDS.some((g) => l.includes(g)))
+              genreCounts.set(t.name, (genreCounts.get(t.name) || 0) + 1);
+          });
+          (data.genres || []).forEach((g) =>
+            genreCounts.set(
+              g.name,
+              (genreCounts.get(g.name) || 0) + (g.count || 1),
+            ),
+          );
+        } catch (e) {
+          console.warn(
+            `Failed to get MusicBrainz tags for ${artist.artistName}: ${e.message}`,
+          );
+        }
+      }
     }
 
     discoveryCache.topTags = Array.from(tagCounts.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 15)
+      .slice(0, 20)
       .map((t) => t[0]);
     discoveryCache.topGenres = Array.from(genreCounts.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
+      .slice(0, 12)
       .map((t) => t[0]);
 
+    console.log(
+      `Identified Top Genres: ${discoveryCache.topGenres.join(", ")}`,
+    );
+
     if (LASTFM_API_KEY) {
+      console.log("Fetching Global Trending artists from Last.fm...");
       try {
         const topData = await lastfmRequest("chart.getTopArtists", {
-          limit: 50,
+          limit: 100,
         });
         if (topData?.artists?.artist) {
           const topArtists = Array.isArray(topData.artists.artist)
@@ -784,16 +822,25 @@ const updateDiscoveryCache = async () => {
               return { id: a.mbid, name: a.name, image: img, type: "Artist" };
             })
             .filter((a) => a.id && !existingArtistIds.has(a.id))
-            .slice(0, 24);
+            .slice(0, 32);
+          console.log(
+            `Found ${discoveryCache.globalTop.length} trending artists.`,
+          );
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error(`Failed to fetch Global Top: ${e.message}`);
+      }
     }
 
-    const recSampleSize = Math.min(8, lidarrArtists.length);
+    const recSampleSize = Math.min(25, lidarrArtists.length);
     const recSample = [...lidarrArtists]
       .sort(() => 0.5 - Math.random())
       .slice(0, recSampleSize);
     const recommendations = new Map();
+
+    console.log(
+      `Generating recommendations based on ${recSample.length} artists...`,
+    );
 
     if (LASTFM_API_KEY) {
       for (const artist of recSample) {
@@ -811,7 +858,7 @@ const updateDiscoveryCache = async () => {
 
           const similar = await lastfmRequest("artist.getSimilar", {
             mbid: artist.foreignArtistId,
-            limit: 15,
+            limit: 25,
           });
           if (similar?.similarartists?.artist) {
             const list = Array.isArray(similar.similarartists.artist)
@@ -847,7 +894,11 @@ const updateDiscoveryCache = async () => {
               }
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn(
+            `Error getting similar artists for ${artist.artistName}: ${e.message}`,
+          );
+        }
       }
     } else {
       const excludeTerms = ["tribute", "cover", "best of", "karaoke"];
@@ -861,11 +912,34 @@ const updateDiscoveryCache = async () => {
             .sort((a, b) => b.count - a.count)
             .slice(0, 10)
             .map((t) => t.name);
+
           if (tags.length > 0) {
-            const search = await musicbrainzRequest("/artist", {
-              query: `${tags.map((t) => `tag:"${t}"`).join(" AND ")} AND type:Group`,
-              limit: 10,
+            // Try specific AND search first
+            let search = await musicbrainzRequest("/artist", {
+              query: `${tags
+                .slice(0, 3)
+                .map((t) => `tag:"${t}"`)
+                .join(" AND ")} AND type:Group`,
+              limit: 15,
             });
+
+            // If too few results, try broader search
+            if (!search.artists || search.artists.length < 5) {
+              const broaderSearch = await musicbrainzRequest("/artist", {
+                query: `${tags
+                  .slice(0, 2)
+                  .map((t) => `tag:"${t}"`)
+                  .join(" OR ")} AND type:Group`,
+                limit: 15,
+              });
+              if (broaderSearch.artists) {
+                search.artists = [
+                  ...(search.artists || []),
+                  ...broaderSearch.artists,
+                ];
+              }
+            }
+
             (search.artists || []).forEach((f) => {
               const ln = f.name.toLowerCase();
               const ld = (f.disambiguation || "").toLowerCase();
@@ -873,7 +947,7 @@ const updateDiscoveryCache = async () => {
                 f.id !== artist.foreignArtistId &&
                 !existingArtistIds.has(f.id) &&
                 !recommendations.has(f.id) &&
-                f.type === "Group" &&
+                (f.type === "Group" || f.type === "Person") &&
                 !excludeTerms.some((t) => ln.includes(t) || ld.includes(t))
               ) {
                 recommendations.set(f.id, {
@@ -885,18 +959,26 @@ const updateDiscoveryCache = async () => {
                   sourceArtist: artist.artistName,
                   disambiguation: f.disambiguation,
                   tags: tags,
-                  score: f.score,
+                  score: f.score || 100,
                 });
               }
             });
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn(
+            `MB Recommendation error for ${artist.artistName}: ${e.message}`,
+          );
+        }
       }
     }
 
     const recommendationsArray = Array.from(recommendations.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 60);
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
+      .slice(0, 100);
+
+    console.log(
+      `Generated ${recommendationsArray.length} total recommendations.`,
+    );
 
     const discoveryData = {
       recommendations: recommendationsArray,
@@ -904,8 +986,8 @@ const updateDiscoveryCache = async () => {
         name: a.artistName,
         id: a.foreignArtistId,
       })),
-      topTags: discoveryCache.topTags,
-      topGenres: discoveryCache.topGenres,
+      topTags: discoveryCache.topTags || [],
+      topGenres: discoveryCache.topGenres || [],
       globalTop: discoveryCache.globalTop || [],
       lastUpdated: new Date().toISOString(),
     };
@@ -915,7 +997,7 @@ const updateDiscoveryCache = async () => {
     await db.write();
 
     const allToHydrate = [
-      ...discoveryCache.globalTop,
+      ...(discoveryCache.globalTop || []),
       ...recommendationsArray,
     ].filter((a) => !a.image);
     console.log(`Hydrating images for ${allToHydrate.length} artists...`);
