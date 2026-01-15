@@ -18,7 +18,7 @@
   "license": "MIT",
   "nodemonConfig": {
     "ignore": [
-      "db.json"
+      "data/db.json"
     ]
   },
   "dependencies": {

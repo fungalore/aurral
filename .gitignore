@@ -46,7 +46,7 @@ coverage/
 *.tmp
 *.temp
 .cache/
-db.json
+backend/data/db.json
 
 # Package manager locks (optional - uncomment if you want to ignore)
 # package-lock.json

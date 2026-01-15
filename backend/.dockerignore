@@ -4,7 +4,7 @@ npm-debug.log*
 .env.local
 .git
 .gitignore
-db.json
+data/db.json
 README.md
 Dockerfile
 .dockerignore

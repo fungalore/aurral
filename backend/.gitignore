@@ -10,7 +10,7 @@ pnpm-debug.log*
 .env.production.local
 logs/
 *.log
-db.json
+data/db.json
 pids/
 *.pid
 *.seed

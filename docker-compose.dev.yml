@@ -15,6 +15,8 @@ services:
       - LIDARR_API_KEY=${LIDARR_API_KEY}
       - CONTACT_EMAIL=${CONTACT_EMAIL:-user@example.com}
       - DEBUG=${DEBUG:-true}
+    volumes:
+      - ./backend/data:/app/data
     networks:
       - aurral-network-dev
     healthcheck:

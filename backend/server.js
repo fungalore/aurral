@@ -6,6 +6,8 @@ import axios from "axios";
 import Bottleneck from "bottleneck";
 import { Low } from "lowdb";
 import { JSONFile } from "lowdb/node";
+import fs from "fs";
+import path from "path";
 
 dotenv.config();
 
@@ -43,7 +45,14 @@ const defaultData = {
   requests: [],
 };
 
-const adapter = new JSONFile("db.json");
+const DATA_DIR = "data";
+const DB_PATH = path.join(DATA_DIR, "db.json");
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+const adapter = new JSONFile(DB_PATH);
 const db = new Low(adapter, defaultData);
 await db.read();
 
