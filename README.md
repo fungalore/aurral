@@ -127,46 +127,6 @@ Aurral features a discovery system that helps you find new music based on what y
 
 ---
 
-## Deployment
-
-### Production Nginx Configuration
-To serve Aurral behind Nginx with SSL, use the following configuration pattern:
-
-```nginx
-server {
-    listen 80;
-    server_name aurral.yourdomain.com;
-
-    location / {
-        root /path/to/aurral/frontend/dist;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-### Systemd Service (Backend)
-If running on bare metal, create `/etc/systemd/system/aurral.service`:
-```ini
-[Service]
-ExecStart=/usr/bin/node /opt/aurral/backend/server.js
-WorkingDirectory=/opt/aurral/backend
-Restart=always
-User=www-data
-Environment=NODE_ENV=production
-```
-
----
-
 ## Configuration
 
 | Variable | Description | Default |
@@ -175,7 +135,7 @@ Environment=NODE_ENV=production
 | `LIDARR_API_KEY` | Your Lidarr API Key | `REQUIRED` |
 | `CONTACT_EMAIL` | Required for MusicBrainz API User-Agent | `REQUIRED` |
 | `PORT` | Backend API port | `3001` |
-| `LASTFM_API_KEY`| (Optional) For enhanced artist images | `null` |
+| `LASTFM_API_KEY`| (Optional) For enhanced artist images & discovery | `null` |
 
 ---
 
