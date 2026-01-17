@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-import { X, Loader, CheckCircle, AlertCircle } from "lucide-react";
+import { X, Loader, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import {
   getLidarrRootFolders,
   getLidarrQualityProfiles,
@@ -13,11 +13,10 @@ function AddArtistModal({ artist, onClose, onSuccess }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-
+  const [showOptions, setShowOptions] = useState(false);
   const [rootFolders, setRootFolders] = useState([]);
   const [qualityProfiles, setQualityProfiles] = useState([]);
   const [metadataProfiles, setMetadataProfiles] = useState([]);
-
   const [selectedRootFolder, setSelectedRootFolder] = useState("");
   const [selectedQualityProfile, setSelectedQualityProfile] = useState("");
   const [selectedMetadataProfile, setSelectedMetadataProfile] = useState("");
@@ -116,7 +115,7 @@ function AddArtistModal({ artist, onClose, onSuccess }) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between rounded-t-xl">
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between rounded-t-xl z-10">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               Add Artist to Lidarr
@@ -153,219 +152,11 @@ function AddArtistModal({ artist, onClose, onSuccess }) {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Root Folder <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={selectedRootFolder}
-                  onChange={(e) => setSelectedRootFolder(e.target.value)}
-                  className="input"
-                  required
-                  disabled={submitting}
-                >
-                  {rootFolders.map((folder) => (
-                    <option key={folder.id} value={folder.path}>
-                      {folder.path}
-                      {folder.freeSpace &&
-                        ` (${(folder.freeSpace / 1024 / 1024 / 1024).toFixed(2)} GB free)`}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Where the artist's music files will be stored
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Quality Profile <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={selectedQualityProfile}
-                  onChange={(e) => setSelectedQualityProfile(e.target.value)}
-                  className="input"
-                  required
-                  disabled={submitting}
-                >
-                  {qualityProfiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Determines which quality versions to download
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Metadata Profile <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={selectedMetadataProfile}
-                  onChange={(e) => setSelectedMetadataProfile(e.target.value)}
-                  className="input"
-                  required
-                  disabled={submitting}
-                >
-                  {metadataProfiles.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Which album types to include (Studio, Live, etc.)
-                </p>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                  Options
-                </h3>
-
-                <div className="flex items-start">
-                  <div className="flex items-center h-5">
-                    <input
-                      type="checkbox"
-                      id="monitored"
-                      checked={monitored}
-                      onChange={(e) => setMonitored(e.target.checked)}
-                      className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded focus:ring-primary-500"
-                      disabled={submitting}
-                    />
-                  </div>
-                  <div className="ml-3">
-                    <label
-                      htmlFor="monitored"
-                      className="font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      Monitor Artist
-                    </label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Lidarr will search for and download new releases
-                    </p>
-                  </div>
-                </div>
-
-                {monitored && (
-                    <div className="ml-8 mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Monitor Option
-                      </label>
-                      <select
-                        value={monitorOption}
-                        onChange={(e) => setMonitorOption(e.target.value)}
-                        className="input text-sm"
-                        disabled={submitting}
-                      >
-                         <option value="all">All Albums</option>
-                         <option value="future">Future Albums</option>
-                         <option value="missing">Missing Albums</option>
-                         <option value="latest">Latest Album</option>
-                         <option value="first">First Album</option>
-                         <option value="none">None (Artist Only)</option>
-                      </select>
-                    </div>
-                )}
-
-                <div className="flex items-start">
-                  <div className="flex items-center h-5">
-                    <input
-                      type="checkbox"
-                      id="searchForMissingAlbums"
-                      checked={searchForMissingAlbums}
-                      onChange={(e) =>
-                        setSearchForMissingAlbums(e.target.checked)
-                      }
-                      className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded focus:ring-primary-500"
-                      disabled={submitting}
-                    />
-                  </div>
-                  <div className="ml-3">
-                    <label
-                      htmlFor="searchForMissingAlbums"
-                      className="font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      Search for Missing Albums on Add
-                    </label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Start searching for existing albums immediately (may take
-                      time)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start">
-                  <div className="flex items-center h-5">
-                    <input
-                      type="checkbox"
-                      id="albumFolders"
-                      checked={albumFolders}
-                      onChange={(e) => setAlbumFolders(e.target.checked)}
-                      className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded focus:ring-primary-500"
-                      disabled={submitting}
-                    />
-                  </div>
-                  <div className="ml-3">
-                    <label
-                      htmlFor="albumFolders"
-                      className="font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      Create Album Folders
-                    </label>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Organize music into separate folders for each album
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {artist.type && (
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2 text-sm">
-                  <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                    Artist Information
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2 text-gray-600 dark:text-gray-400">
-                    {artist.type && (
-                      <div>
-                        <span className="font-medium">Type:</span> {artist.type}
-                      </div>
-                    )}
-                    {artist.country && (
-                      <div>
-                        <span className="font-medium">Country:</span>{" "}
-                        {artist.country}
-                      </div>
-                    )}
-                    {artist["life-span"]?.begin && (
-                      <div>
-                        <span className="font-medium">Active:</span>{" "}
-                        {artist["life-span"].begin.split("-")[0]}
-                        {artist["life-span"].ended && artist["life-span"].end
-                          ? ` - ${artist["life-span"].end.split("-")[0]}`
-                          : " - Present"}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="btn btn-secondary flex-1"
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="flex gap-3">
                 <button
                   type="submit"
-                  className="btn btn-primary flex-1 disabled:opacity-50"
+                  className="btn btn-primary flex-1 disabled:opacity-50 h-12"
                   disabled={submitting}
                 >
                   {submitting ? (
@@ -380,7 +171,200 @@ function AddArtistModal({ artist, onClose, onSuccess }) {
                     </>
                   )}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOptions(!showOptions)}
+                  className="btn btn-secondary flex items-center justify-center px-4"
+                  title="Advanced Options"
+                  disabled={submitting}
+                >
+                  {showOptions ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </button>
               </div>
+
+              {showOptions && (
+                <div className="space-y-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Root Folder <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={selectedRootFolder}
+                      onChange={(e) => setSelectedRootFolder(e.target.value)}
+                      className="input"
+                      required
+                      disabled={submitting}
+                    >
+                      {rootFolders.map((folder) => (
+                        <option key={folder.id} value={folder.path}>
+                          {folder.path}
+                          {folder.freeSpace &&
+                            ` (${(folder.freeSpace / 1024 / 1024 / 1024).toFixed(2)} GB free)`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Quality Profile <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={selectedQualityProfile}
+                      onChange={(e) => setSelectedQualityProfile(e.target.value)}
+                      className="input"
+                      required
+                      disabled={submitting}
+                    >
+                      {qualityProfiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Metadata Profile <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={selectedMetadataProfile}
+                      onChange={(e) => setSelectedMetadataProfile(e.target.value)}
+                      className="input"
+                      required
+                      disabled={submitting}
+                    >
+                      {metadataProfiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                      Options
+                    </h3>
+
+                    <div className="flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          type="checkbox"
+                          id="monitored"
+                          checked={monitored}
+                          onChange={(e) => setMonitored(e.target.checked)}
+                          className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded focus:ring-primary-500"
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="ml-3">
+                        <label
+                          htmlFor="monitored"
+                          className="font-medium text-gray-700 dark:text-gray-300"
+                        >
+                          Monitor Artist
+                        </label>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Lidarr will search for and download new releases
+                        </p>
+                      </div>
+                    </div>
+
+                    {monitored && (
+                        <div className="ml-8 mb-4">
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Monitor Option
+                          </label>
+                          <select
+                            value={monitorOption}
+                            onChange={(e) => setMonitorOption(e.target.value)}
+                            className="input text-sm"
+                            disabled={submitting}
+                          >
+                             <option value="all">All Albums</option>
+                             <option value="future">Future Albums</option>
+                             <option value="missing">Missing Albums</option>
+                             <option value="latest">Latest Album</option>
+                             <option value="first">First Album</option>
+                             <option value="none">None (Artist Only)</option>
+                          </select>
+                        </div>
+                    )}
+
+                    <div className="flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          type="checkbox"
+                          id="searchForMissingAlbums"
+                          checked={searchForMissingAlbums}
+                          onChange={(e) =>
+                            setSearchForMissingAlbums(e.target.checked)
+                          }
+                          className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded focus:ring-primary-500"
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="ml-3">
+                        <label
+                          htmlFor="searchForMissingAlbums"
+                          className="font-medium text-gray-700 dark:text-gray-300"
+                        >
+                          Search for Missing Albums on Add
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          type="checkbox"
+                          id="albumFolders"
+                          checked={albumFolders}
+                          onChange={(e) => setAlbumFolders(e.target.checked)}
+                          className="w-4 h-4 text-primary-600 border-gray-300 dark:border-gray-600 dark:bg-gray-800 rounded focus:ring-primary-500"
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="ml-3">
+                        <label
+                          htmlFor="albumFolders"
+                          className="font-medium text-gray-700 dark:text-gray-300"
+                        >
+                          Create Album Folders
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!showOptions && (
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="btn btn-secondary flex-1"
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {showOptions && (
+                 <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="btn btn-secondary flex-1"
+                      disabled={submitting}
+                    >
+                      Cancel
+                    </button>
+                 </div>
+              )}
             </form>
           )}
         </div>

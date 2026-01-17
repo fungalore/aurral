@@ -19,9 +19,9 @@ export function Toast({ toast, onDismiss }) {
   };
 
   const styles = {
-    success: "border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-900/50",
-    error: "border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-900/50",
-    info: "border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/50",
+    success: "border-green-200 bg-green-50 dark:bg-green-900/80 dark:border-green-900/50",
+    error: "border-red-200 bg-red-50 dark:bg-red-900/80 dark:border-red-900/50",
+    info: "border-blue-200 bg-blue-50 dark:bg-blue-900/80 dark:border-blue-900/50",
   };
 
   return (

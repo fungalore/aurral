@@ -12,6 +12,10 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    const password = localStorage.getItem("auth_password");
+    if (password) {
+      config.headers["x-auth-password"] = password;
+    }
     return config;
   },
   (error) => {
@@ -33,6 +37,11 @@ api.interceptors.response.use(
 
 export const checkHealth = async () => {
   const response = await api.get("/health");
+  return response.data;
+};
+
+export const getAuthConfig = async () => {
+  const response = await api.get("/auth/config");
   return response.data;
 };
 
