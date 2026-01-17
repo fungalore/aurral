@@ -5,6 +5,7 @@ import {
   getLidarrQualityProfiles,
   getLidarrMetadataProfiles,
   addArtistToLidarr,
+  getAppSettings,
 } from "../utils/api";
 
 function AddArtistModal({ artist, onClose, onSuccess }) {
@@ -29,19 +30,30 @@ function AddArtistModal({ artist, onClose, onSuccess }) {
       setError(null);
 
       try {
-        const [folders, quality, metadata] = await Promise.all([
+        const [folders, quality, metadata, savedSettings] = await Promise.all([
           getLidarrRootFolders(),
           getLidarrQualityProfiles(),
           getLidarrMetadataProfiles(),
+          getAppSettings(),
         ]);
 
         setRootFolders(folders);
         setQualityProfiles(quality);
         setMetadataProfiles(metadata);
 
-        if (folders.length > 0) setSelectedRootFolder(folders[0].path);
-        if (quality.length > 0) setSelectedQualityProfile(quality[0].id);
-        if (metadata.length > 0) setSelectedMetadataProfile(metadata[0].id);
+        // Apply saved defaults or first available
+        setSelectedRootFolder(
+          savedSettings.rootFolderPath || (folders[0]?.path ?? ""),
+        );
+        setSelectedQualityProfile(
+          savedSettings.qualityProfileId || (quality[0]?.id ?? ""),
+        );
+        setSelectedMetadataProfile(
+          savedSettings.metadataProfileId || (metadata[0]?.id ?? ""),
+        );
+        setMonitored(savedSettings.monitored ?? true);
+        setSearchForMissingAlbums(savedSettings.searchForMissingAlbums ?? false);
+        setAlbumFolders(savedSettings.albumFolders ?? true);
       } catch (err) {
         setError(
           err.response?.data?.message || "Failed to load configuration options",
@@ -346,3 +358,4 @@ function AddArtistModal({ artist, onClose, onSuccess }) {
 }
 
 export default AddArtistModal;
+

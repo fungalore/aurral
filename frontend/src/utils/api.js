@@ -141,4 +141,15 @@ export const searchArtistsByTag = async (tag, limit = 20) => {
   return response.data;
 };
 
+export const getAppSettings = async () => {
+  const response = await api.get("/settings");
+  return response.data;
+};
+
+export const updateAppSettings = async (settings) => {
+  const response = await api.post("/settings", settings);
+  return response.data;
+};
+
 export default api;
+
