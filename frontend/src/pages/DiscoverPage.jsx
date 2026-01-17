@@ -113,22 +113,39 @@ function DiscoverPage() {
   const genreSections = useMemo(() => {
     if (!data?.topGenres || !data?.recommendations) return [];
 
-    return data.topGenres
-      .slice(0, 4)
-      .map((genre) => {
-        const genreArtists = data.recommendations.filter((artist) => {
-          const artistTags = artist.tags || [];
-          return artistTags.some((tag) =>
-            tag.toLowerCase().includes(genre.toLowerCase()),
-          );
-        });
+    const sections = [];
+    const usedArtistIds = new Set();
 
-        return {
+    // Iterate through all top genres to find distinct sections
+    for (const genre of data.topGenres) {
+      // Stop if we have enough sections
+      if (sections.length >= 4) break;
+
+      const genreArtists = data.recommendations.filter((artist) => {
+        // Skip if artist already appears in a previous section
+        if (usedArtistIds.has(artist.id)) return false;
+
+        const artistTags = artist.tags || [];
+        return artistTags.some((tag) =>
+          tag.toLowerCase().includes(genre.toLowerCase()),
+        );
+      });
+
+      // Only create a section if we have enough unique artists
+      if (genreArtists.length >= 4) {
+        const selectedArtists = genreArtists.slice(0, 6);
+        
+        // Mark artists as used
+        selectedArtists.forEach(artist => usedArtistIds.add(artist.id));
+
+        sections.push({
           genre,
-          artists: genreArtists,
-        };
-      })
-      .filter((section) => section.artists.length > 0);
+          artists: selectedArtists,
+        });
+      }
+    }
+
+    return sections;
   }, [data]);
 
   const ArtistCard = ({ artist, status }) => (

@@ -176,123 +176,78 @@ function SearchResultsPage() {
                 </h2>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                 {results.map((artist) => (
                   <div
                     key={artist.id}
-                    className="card hover:shadow-md transition-shadow group"
+                    className="group relative flex flex-col w-full min-w-0"
                   >
                     <div
                       onClick={() => navigate(`/artist/${artist.id}`)}
-                      className="cursor-pointer"
+                      className="relative aspect-square mb-3 overflow-hidden rounded-xl bg-gray-200 dark:bg-gray-800 cursor-pointer shadow-sm group-hover:shadow-md transition-all"
                     >
                       {/* Artist Image */}
-                      <div className="w-full h-48 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden mb-4">
                         <ArtistImage
                           src={artistImages[artist.id]}
                           mbid={artist.id}
                           alt={artist.name}
-                          className="w-full h-full"
+                          className="h-full w-full group-hover:scale-105 transition-transform duration-300"
                         />
-                      </div>
 
-                      <div className="mb-3 min-w-0">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 group-hover:text-primary-500 transition-colors mb-1 truncate">
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          {!existingArtists[artist.id] && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddArtistClick(artist);
+                              }}
+                              className="p-2 bg-primary-500 text-white rounded-full hover:bg-primary-600 hover:scale-110 transition-all shadow-lg"
+                              title="Add to Lidarr"
+                            >
+                              <Plus className="w-5 h-5" />
+                            </button>
+                          )}
+                          <a
+                            href={`https://musicbrainz.org/artist/${artist.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-2 bg-white/20 backdrop-blur-sm text-white rounded-full hover:bg-white/30 hover:scale-110 transition-all"
+                            title="View on MusicBrainz"
+                          >
+                            <ExternalLink className="w-5 h-5" />
+                          </a>
+                        </div>
+                        
+                        {existingArtists[artist.id] && (
+                          <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full shadow-md">
+                            <CheckCircle className="w-3 h-3" />
+                          </div>
+                        )}
+                    </div>
+
+                    <div className="flex flex-col min-w-0">
+                        <h3 
+                          onClick={() => navigate(`/artist/${artist.id}`)}
+                          className="font-semibold text-gray-900 dark:text-gray-100 truncate hover:text-primary-500 cursor-pointer"
+                        >
                           {artist.name}
                         </h3>
-                        {artist["sort-name"] &&
-                          artist["sort-name"] !== artist.name && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-
-                              {artist["sort-name"]}
+                        
+                        <div className="flex flex-col min-w-0 text-sm text-gray-500 dark:text-gray-400">
+                          {artist.type && (
+                             <p className="truncate">
+                              {getArtistType(artist.type)}
                             </p>
                           )}
-                      </div>
-
-                      <div className="space-y-2 mb-4 min-w-0">
-                        {artist.type && (
-                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 min-w-0">
-                            <span className="font-medium mr-2 text-gray-700 dark:text-gray-400 flex-shrink-0">
-                              Type:
-                            </span>
-                            <span className="badge badge-primary truncate">
-                              {getArtistType(artist.type)}
-                            </span>
-                          </div>
-                        )}
-
-                        {artist["life-span"] &&
-
-                          formatLifeSpan(artist["life-span"]) && (
-                            <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 min-w-0">
-                              <span className="font-medium mr-2 text-gray-700 dark:text-gray-400 flex-shrink-0">
-                                Active:
-                              </span>
-                              <span className="truncate">
-                                {formatLifeSpan(artist["life-span"])}
-                              </span>
-                            </div>
+                          
+                          {artist.country && (
+                            <p className="truncate text-xs opacity-80">
+                              {artist.country}
+                            </p>
                           )}
-
-                        {artist.country && (
-                          <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 min-w-0">
-                            <span className="font-medium mr-2 text-gray-700 dark:text-gray-400 flex-shrink-0">
-                              Country:
-                            </span>
-                            <span className="truncate">{artist.country}</span>
-                          </div>
-                        )}
-
-                        {artist.disambiguation && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400 italic truncate">
-                            {artist.disambiguation}
-                          </div>
-                        )}
-
-                        {artist.tags && artist.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {artist.tags.slice(0, 3).map((tag, idx) => (
-                              <span
-                                key={idx}
-                                className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-400"
-                              >
-                                {tag.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
-                      {existingArtists[artist.id] ? (
-                        <div className="flex items-center text-green-600 dark:text-green-400 text-sm font-medium flex-1">
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          In Library
                         </div>
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddArtistClick(artist);
-                          }}
-                          className="btn btn-primary btn-sm flex-1 text-sm"
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add to Lidarr
-                        </button>
-                      )}
-                      <a
-                        href={`https://musicbrainz.org/artist/${artist.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="btn btn-secondary btn-sm text-sm"
-                        title="View on MusicBrainz"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
+                      </div>
                   </div>
                 ))}
               </div>
