@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 
-function Sidebar({ isHealthy, lidarrConfigured }) {
+function Sidebar({ isHealthy, lidarrConfigured, lidarrStatus }) {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
@@ -108,8 +108,10 @@ function Sidebar({ isHealthy, lidarrConfigured }) {
                   className={`w-2 h-2 rounded-full ${
                     isHealthy === null
                       ? "bg-gray-400 dark:bg-gray-500"
-                      : isHealthy && lidarrConfigured
+                      : isHealthy && lidarrConfigured && lidarrStatus === "connected"
                         ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                        : isHealthy && lidarrConfigured && lidarrStatus !== "connected"
+                           ? "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]"
                         : isHealthy
                           ? "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"
                           : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
@@ -118,8 +120,10 @@ function Sidebar({ isHealthy, lidarrConfigured }) {
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {isHealthy === null
                     ? "Checking..."
-                    : isHealthy && lidarrConfigured
+                    : isHealthy && lidarrConfigured && lidarrStatus === "connected"
                       ? "Online"
+                       : isHealthy && lidarrConfigured && lidarrStatus !== "connected"
+                        ? "Lidarr Down"
                       : isHealthy
                         ? "Config"
                         : "Offline"}

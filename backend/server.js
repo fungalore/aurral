@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import axios from "axios";
 import Bottleneck from "bottleneck";
 import { Low } from "lowdb";
@@ -31,6 +32,9 @@ const GENRE_KEYWORDS = [
   "disco",
   "funk",
 ];
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const defaultData = {
   discovery: {
     recommendations: [],
@@ -86,6 +90,7 @@ const getCachedLidarrArtists = async (forceRefresh = false) => {
 };
 
 app.use(cors());
+app.use(helmet());
 app.use(express.json());
 
 const limiter = rateLimit({
@@ -101,9 +106,23 @@ app.get("/api/settings", (req, res) => {
 
 app.post("/api/settings", async (req, res) => {
   try {
+    const {
+      rootFolderPath,
+      qualityProfileId,
+      metadataProfileId,
+      monitored,
+      searchForMissingAlbums,
+      albumFolders,
+    } = req.body;
+
     db.data.settings = {
       ...(db.data.settings || defaultData.settings),
-      ...req.body,
+      rootFolderPath,
+      qualityProfileId,
+      metadataProfileId,
+      monitored,
+      searchForMissingAlbums,
+      albumFolders,
     };
   await db.write();
     res.json(db.data.settings);
@@ -120,7 +139,10 @@ const LASTFM_API = "https://ws.audioscrobbler.com/2.0/";
 const LASTFM_API_KEY = process.env.LASTFM_API_KEY;
 const APP_NAME = "Aurral";
 const APP_VERSION = "1.0.0";
-const CONTACT = process.env.CONTACT_EMAIL || "user@example.com";
+const CONTACT = process.env.CONTACT_EMAIL;
+if (!CONTACT || CONTACT === 'user@example.com') {
+  console.warn('WARNING: CONTACT_EMAIL not set. MusicBrainz may rate-limit requests.');
+}
 
 const mbLimiter = new Bottleneck({
   maxConcurrent: 1,
@@ -177,7 +199,7 @@ const lastfmRequest = async (method, params = {}) => {
   }
 };
 
-const lidarrRequest = async (endpoint, method = "GET", data = null) => {
+const lidarrRequest = async (endpoint, method = "GET", data = null, silent = false) => {
   if (!LIDARR_API_KEY) {
     throw new Error("Lidarr API key not configured");
   }
@@ -198,15 +220,30 @@ const lidarrRequest = async (endpoint, method = "GET", data = null) => {
     const response = await axios(config);
     return response.data;
   } catch (error) {
-    console.error("Lidarr API error:", error.response?.data || error.message);
+    if (!silent) {
+      console.error("Lidarr API error:", error.response?.data || error.message);
+    }
     throw error;
   }
 };
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", async (req, res) => {
+  let lidarrStatus = "unknown";
+  try {
+    if (LIDARR_API_KEY) {
+      await lidarrRequest("/system/status", "GET", null, true);
+      lidarrStatus = "connected";
+    } else {
+      lidarrStatus = "not_configured";
+    }
+  } catch (error) {
+    lidarrStatus = "unreachable";
+  }
+
   res.json({
     status: "ok",
     lidarrConfigured: !!LIDARR_API_KEY,
+    lidarrStatus,
     lastfmConfigured: !!LASTFM_API_KEY,
     discovery: {
       lastUpdated: discoveryCache?.lastUpdated || null,
@@ -235,8 +272,6 @@ app.get("/api/search/artists", async (req, res) => {
       offset,
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
     res.json(data);
   } catch (error) {
     res.status(500).json({
@@ -250,11 +285,13 @@ app.get("/api/artists/:mbid", async (req, res) => {
   try {
     const { mbid } = req.params;
 
+    if (!UUID_REGEX.test(mbid)) {
+      return res.status(400).json({ error: "Invalid MBID format" });
+    }
+
     const data = await musicbrainzRequest(`/artist/${mbid}`, {
       inc: "aliases+tags+ratings+genres+release-groups",
     });
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     res.json(data);
   } catch (error) {
@@ -390,6 +427,11 @@ const getArtistImage = async (mbid) => {
 app.get("/api/artists/:mbid/cover", async (req, res) => {
   try {
     const { mbid } = req.params;
+
+    if (!UUID_REGEX.test(mbid)) {
+      return res.status(400).json({ error: "Invalid MBID format" });
+    }
+
     const result = await getArtistImage(mbid);
     res.json({ images: result.images });
   } catch (error) {
@@ -403,6 +445,11 @@ app.get("/api/artists/:mbid/cover", async (req, res) => {
 app.get("/api/artists/:mbid/similar", async (req, res) => {
   try {
     const { mbid } = req.params;
+
+    if (!UUID_REGEX.test(mbid)) {
+      return res.status(400).json({ error: "Invalid MBID format" });
+    }
+
     const { limit = 20 } = req.query;
 
     if (!LASTFM_API_KEY) {
@@ -512,6 +559,10 @@ app.get("/api/lidarr/artists/:id", async (req, res) => {
 app.get("/api/lidarr/lookup/:mbid", async (req, res) => {
   try {
     const { mbid } = req.params;
+
+    if (!UUID_REGEX.test(mbid)) {
+      return res.status(400).json({ error: "Invalid MBID format" });
+    }
 
     const artists = await getCachedLidarrArtists();
 
@@ -713,6 +764,11 @@ app.get("/api/requests", async (req, res) => {
 
 app.delete("/api/requests/:mbid", async (req, res) => {
   const { mbid } = req.params;
+
+  if (!UUID_REGEX.test(mbid)) {
+    return res.status(400).json({ error: "Invalid MBID format" });
+  }
+
   db.data.requests = (db.data.requests || []).filter((r) => r.mbid !== mbid);
   await db.write();
   res.json({ success: true });
@@ -1304,8 +1360,6 @@ app.get("/api/discover/by-tag", async (req, res) => {
         query: `tag:"${tag}" AND type:Group`,
         limit,
       });
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       recommendations = (data.artists || []).map((artist) => ({
         id: artist.id,

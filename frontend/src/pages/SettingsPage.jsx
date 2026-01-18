@@ -324,11 +324,18 @@ function SettingsPage() {
                     Lidarr Connection
                   </span>
                   <div className="flex items-center">
-                    {health.lidarrConfigured ? (
+                    {health.lidarrConfigured && health.lidarrStatus === "connected" ? (
                       <>
                         <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
                         <span className="text-green-700 dark:text-green-400 font-medium">
-                          Configured
+                          Connected
+                        </span>
+                      </>
+                    ) : health.lidarrConfigured ? (
+                       <>
+                        <AlertCircle className="w-5 h-5 text-orange-500 mr-2" />
+                        <span className="text-orange-700 dark:text-orange-400 font-medium">
+                          Unreachable
                         </span>
                       </>
                     ) : (

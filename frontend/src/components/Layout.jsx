@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import Sidebar from "./Sidebar";
 
-function Layout({ children, isHealthy, lidarrConfigured }) {
+function Layout({ children, isHealthy, lidarrConfigured, lidarrStatus }) {
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
@@ -17,7 +17,7 @@ function Layout({ children, isHealthy, lidarrConfigured }) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 font-sans antialiased transition-colors duration-200">
-      <Sidebar isHealthy={isHealthy} lidarrConfigured={lidarrConfigured} />
+      <Sidebar isHealthy={isHealthy} lidarrConfigured={lidarrConfigured} lidarrStatus={lidarrStatus} />
 
       <div className="md:ml-64 flex flex-col min-h-screen transition-all duration-300 ease-in-out">
         <header className="sticky top-0 z-30 pl-16 pr-6 py-4 md:px-6 bg-gray-50/90 dark:bg-gray-950/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 flex items-center">

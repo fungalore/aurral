@@ -19,6 +19,7 @@ import { ToastProvider } from "./contexts/ToastContext";
 function App() {
   const [isHealthy, setIsHealthy] = useState(null);
   const [lidarrConfigured, setLidarrConfigured] = useState(false);
+  const [lidarrStatus, setLidarrStatus] = useState("unknown");
 
   useEffect(() => {
     const checkApiHealth = async () => {
@@ -26,9 +27,11 @@ function App() {
         const health = await checkHealth();
         setIsHealthy(health.status === "ok");
         setLidarrConfigured(health.lidarrConfigured);
+        setLidarrStatus(health.lidarrStatus || "unknown");
       } catch (error) {
         console.error("Health check failed:", error);
         setIsHealthy(false);
+        setLidarrStatus("unknown");
       }
     };
 
@@ -42,7 +45,7 @@ function App() {
     <ThemeProvider>
       <ToastProvider>
         <Router>
-        <Layout isHealthy={isHealthy} lidarrConfigured={lidarrConfigured}>
+        <Layout isHealthy={isHealthy} lidarrConfigured={lidarrConfigured} lidarrStatus={lidarrStatus}>
           {isHealthy === false && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4">
               <div className="flex items-center">
