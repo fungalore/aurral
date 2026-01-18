@@ -96,8 +96,18 @@ app.use(express.json());
 
 if (process.env.AUTH_PASSWORD) {
   const adminUser = process.env.AUTH_USER || "admin";
+  const validPasswords = process.env.AUTH_PASSWORD.split(",")
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+
   const auth = basicAuth({
-    users: { [adminUser]: process.env.AUTH_PASSWORD },
+    authorizer: (username, password) => {
+      const userMatches = basicAuth.safeCompare(username, adminUser);
+      const passwordMatches = validPasswords.some((p) =>
+        basicAuth.safeCompare(password, p),
+      );
+      return userMatches && passwordMatches;
+    },
     challenge: false,
   });
 

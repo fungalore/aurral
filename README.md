@@ -136,7 +136,7 @@ Aurral features a discovery system that helps you find new music based on what y
 | `CONTACT_EMAIL` | Required for MusicBrainz API User-Agent | `REQUIRED` |
 | `PORT` | Backend API port | `3001` |
 | `LASTFM_API_KEY`| (Optional) For enhanced artist images & discovery | `null` |
-| `AUTH_PASSWORD` | (Optional) Password for basic authentication protection | `null` |
+| `AUTH_PASSWORD` | (Optional) Password for basic authentication protection. Comma-separated for multiple passwords. | `null` |
 
 ---
 
