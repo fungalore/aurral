@@ -31,7 +31,6 @@ const GENRE_KEYWORDS = [
   "disco",
   "funk",
 ];
-
 const defaultData = {
   discovery: {
     recommendations: [],
@@ -396,6 +395,60 @@ app.get("/api/artists/:mbid/cover", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: "Failed to fetch cover art",
+      message: error.message,
+    });
+  }
+});
+
+app.get("/api/artists/:mbid/similar", async (req, res) => {
+  try {
+    const { mbid } = req.params;
+    const { limit = 20 } = req.query;
+
+    if (!LASTFM_API_KEY) {
+      return res.json({ artists: [] });
+    }
+
+    const data = await lastfmRequest("artist.getSimilar", {
+      mbid,
+      limit,
+    });
+
+    if (!data?.similarartists?.artist) {
+      return res.json({ artists: [] });
+    }
+
+    const artists = Array.isArray(data.similarartists.artist)
+      ? data.similarartists.artist
+      : [data.similarartists.artist];
+
+    const formattedArtists = artists
+      .map((a) => {
+        let img = null;
+        if (a.image && Array.isArray(a.image)) {
+          const i =
+            a.image.find((img) => img.size === "extralarge") ||
+            a.image.find((img) => img.size === "large");
+          if (
+            i &&
+            i["#text"] &&
+            !i["#text"].includes("2a96cbd8b46e442fc41c2b86b821562f")
+          )
+            img = i["#text"];
+        }
+        return {
+          id: a.mbid,
+          name: a.name,
+          image: img,
+          match: Math.round((a.match || 0) * 100),
+        };
+      })
+      .filter((a) => a.id);
+
+    res.json({ artists: formattedArtists });
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to fetch similar artists",
       message: error.message,
     });
   }

@@ -62,6 +62,13 @@ export const getArtistCover = async (mbid) => {
   return response.data;
 };
 
+export const getSimilarArtistsForArtist = async (mbid, limit = 20) => {
+  const response = await api.get(`/artists/${mbid}/similar`, {
+    params: { limit },
+  });
+  return response.data;
+};
+
 export const getLidarrArtists = async () => {
   const response = await api.get("/lidarr/artists");
   return response.data;

@@ -10,6 +10,7 @@ import {
   Calendar,
   MapPin,
   Tag,
+  Sparkles,
 } from "lucide-react";
 import {
   getArtistDetails,
@@ -18,9 +19,12 @@ import {
   getLidarrAlbums,
   updateLidarrAlbum,
   searchLidarrAlbum,
+  getSimilarArtistsForArtist,
+  lookupArtistsInLidarrBatch,
 } from "../utils/api";
 import { useToast } from "../contexts/ToastContext";
 import AddArtistModal from "../components/AddArtistModal";
+import ArtistImage from "../components/ArtistImage";
 
 function ArtistDetailsPage() {
   const { mbid } = useParams();
@@ -29,10 +33,13 @@ function ArtistDetailsPage() {
   const [coverImages, setCoverImages] = useState([]);
   const [lidarrArtist, setLidarrArtist] = useState(null);
   const [lidarrAlbums, setLidarrAlbums] = useState([]);
+  const [similarArtists, setSimilarArtists] = useState([]);
+  const [existingSimilar, setExistingSimilar] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [existsInLidarr, setExistsInLidarr] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [artistToAdd, setArtistToAdd] = useState(null);
   const [requestingAlbum, setRequestingAlbum] = useState(null);
   const { showSuccess, showError } = useToast();
 
@@ -45,6 +52,19 @@ function ArtistDetailsPage() {
         const artistData = await getArtistDetails(mbid);
         setArtist(artistData);
 
+        // Fetch similar artists
+        try {
+          const similarData = await getSimilarArtistsForArtist(mbid);
+          setSimilarArtists(similarData.artists || []);
+          if (similarData.artists?.length > 0) {
+            const similarMbids = similarData.artists.map((a) => a.id);
+            const existingMap = await lookupArtistsInLidarrBatch(similarMbids);
+            setExistingSimilar(existingMap);
+          }
+        } catch (err) {
+          console.error("Failed to fetch similar artists:", err);
+        }
+
         try {
           const coverData = await getArtistCover(mbid);
           if (coverData.images && coverData.images.length > 0) {
@@ -53,30 +73,29 @@ function ArtistDetailsPage() {
         } catch (err) {
           console.log("No cover art available");
         }
-
-          try {
-            const lookup = await lookupArtistInLidarr(mbid);
-            setExistsInLidarr(lookup.exists);
-            if (lookup.exists && lookup.artist) {
-              setLidarrArtist(lookup.artist);
-              // Wait a moment for Lidarr to process metadata if just added
-              setTimeout(async () => {
-                try {
-                  const albums = await getLidarrAlbums(lookup.artist.id);
-                  console.log("Lidarr Albums:", albums); // DEBUG
-                  setLidarrAlbums(albums);
-                } catch (err) {
-                   // Retry once if failed immediately
-                   console.log("Retrying album fetch...");
-                   setTimeout(async () => {
                       try {
-                        const albums = await getLidarrAlbums(lookup.artist.id);
-                        setLidarrAlbums(albums);
-                      } catch (e) {}
-                   }, 2000);
-                }
-              }, 1000);
-            }
+        const lookup = await lookupArtistInLidarr(mbid);
+          setExistsInLidarr(lookup.exists);
+        if (lookup.exists && lookup.artist) {
+            setLidarrArtist(lookup.artist);
+            // Wait a moment for Lidarr to process metadata if just added
+            setTimeout(async () => {
+    try {
+                const albums = await getLidarrAlbums(lookup.artist.id);
+                console.log("Lidarr Albums:", albums); // DEBUG
+                setLidarrAlbums(albums);
+    } catch (err) {
+                // Retry once if failed immediately
+                console.log("Retrying album fetch...");
+                setTimeout(async () => {
+                  try {
+                    const albums = await getLidarrAlbums(lookup.artist.id);
+                    setLidarrAlbums(albums);
+                  } catch (e) {}
+                }, 2000);
+    }
+            }, 1000);
+          }
         } catch (err) {
           console.error("Failed to lookup artist in Lidarr:", err);
         }
@@ -91,24 +110,33 @@ function ArtistDetailsPage() {
 
     fetchArtistData();
   }, [mbid]);
-
   const handleAddArtistClick = () => {
     setShowAddModal(true);
   };
 
   const handleAddSuccess = async (addedArtist) => {
-    setExistsInLidarr(true);
+    // If we weren't adding a specific 'artistToAdd' (similar artist), then we were adding the main artist
+    if (!artistToAdd) {
+      setExistsInLidarr(true);
+    }
+
     setShowAddModal(false);
+    setArtistToAdd(null);
     showSuccess(`Successfully added ${addedArtist.name} to Lidarr!`);
     
+    // Update local state if it was a similar artist being added
+    if (addedArtist.id) {
+      setExistingSimilar((prev) => ({ ...prev, [addedArtist.id]: true }));
+    }
+
     // Allow Lidarr some time to fetch metadata
     setTimeout(async () => {
         try {
         const lookup = await lookupArtistInLidarr(mbid);
         if (lookup.exists && lookup.artist) {
-            setLidarrArtist(lookup.artist);
-            const albums = await getLidarrAlbums(lookup.artist.id);
-            setLidarrAlbums(albums);
+          setLidarrArtist(lookup.artist);
+          const albums = await getLidarrAlbums(lookup.artist.id);
+          setLidarrAlbums(albums);
         }
         } catch (err) {
         console.error("Failed to refresh Lidarr data", err);
@@ -116,15 +144,14 @@ function ArtistDetailsPage() {
     }, 1500);
   };
 
-
   const handleRequestAlbum = async (albumId, title) => {
     setRequestingAlbum(albumId);
     try {
       // Get the Lidarr album ID
       const lidarrAlbum = lidarrAlbums.find(
-        (a) => a.foreignAlbumId === albumId
-      );
-      
+        (a) => a.foreignAlbumId === albumId,
+    );
+
       if (!lidarrAlbum) {
         throw new Error("Album not found in Lidarr");
       }
@@ -141,9 +168,9 @@ function ArtistDetailsPage() {
       // Update local state
       setLidarrAlbums((prev) =>
         prev.map((a) =>
-          a.id === lidarrAlbum.id ? { ...a, monitored: true } : a
-        )
-      );
+          a.id === lidarrAlbum.id ? { ...a, monitored: true } : a,
+        ),
+    );
 
       showSuccess(`Requested album: ${title}`);
     } catch (err) {
@@ -156,9 +183,7 @@ function ArtistDetailsPage() {
   const getAlbumStatus = (releaseGroupId) => {
     if (!existsInLidarr || lidarrAlbums.length === 0) return null;
 
-    const album = lidarrAlbums.find(
-      (a) => a.foreignAlbumId === releaseGroupId
-    );
+    const album = lidarrAlbums.find((a) => a.foreignAlbumId === releaseGroupId);
 
     if (!album) {
       // Album not found in Lidarr's list.
@@ -218,8 +243,8 @@ function ArtistDetailsPage() {
     return (
       <div className="flex justify-center items-center py-20">
         <Loader className="w-12 h-12 text-primary-600 animate-spin" />
-      </div>
-    );
+              </div>
+                );
   }
 
   if (error) {
@@ -237,8 +262,8 @@ function ArtistDetailsPage() {
           >
             Back to Search
           </button>
-        </div>
       </div>
+          </div>
     );
   }
 
@@ -446,7 +471,7 @@ function ArtistDetailsPage() {
                             onClick={() =>
                               handleRequestAlbum(
                                 releaseGroup.id,
-                                releaseGroup.title
+                                releaseGroup.title,
                               )
                             }
                             disabled={requestingAlbum === releaseGroup.id}
@@ -463,9 +488,9 @@ function ArtistDetailsPage() {
                         // If it's in Lidarr's list but we failed to match it above (unlikely if logic is correct),
                         // or if it's genuinely not in Lidarr's database for this artist.
                         // We can't request it if we don't have a Lidarr ID for it.
-                         <span className="text-xs text-gray-400 italic">
-                           Not in Lidarr
-                         </span>
+                        <span className="text-xs text-gray-400 italic">
+                          Not in Lidarr
+                        </span>
                       ) : (
                         <span className="text-xs text-gray-400 italic">
                           Add Artist First
@@ -511,6 +536,62 @@ function ArtistDetailsPage() {
         </div>
       )}
 
+      {similarArtists.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center">
+            <Sparkles className="w-6 h-6 mr-2 text-primary-500" />
+            Similar Artists
+          </h2>
+          <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar">
+            {similarArtists.map((similar) => (
+              <div
+                key={similar.id}
+                className="flex-shrink-0 w-40 group cursor-pointer"
+                onClick={() => navigate(`/artist/${similar.id}`)}
+              >
+                <div className="relative aspect-square rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-800 mb-2 shadow-sm group-hover:shadow-md transition-all">
+                  <ArtistImage
+                    src={similar.image}
+                    mbid={similar.id}
+                    alt={similar.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  />
+
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    {!existingSimilar[similar.id] && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setArtistToAdd(similar);
+                        }}
+                        className="p-1.5 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {existingSimilar[similar.id] && (
+                    <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full shadow-md">
+                      <CheckCircle className="w-2.5 h-2.5" />
+                    </div>
+                  )}
+
+                  {similar.match && (
+                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+                      {similar.match}% Match
+                    </div>
+                  )}
+                </div>
+                <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-500 transition-colors">
+                  {similar.name}
+                </h3>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showAddModal && artist && (
         <AddArtistModal
           artist={{
@@ -524,8 +605,20 @@ function ArtistDetailsPage() {
           onSuccess={handleAddSuccess}
         />
       )}
+
+      {artistToAdd && (
+        <AddArtistModal
+          artist={{
+            id: artistToAdd.id,
+            name: artistToAdd.name,
+          }}
+          onClose={() => setArtistToAdd(null)}
+          onSuccess={handleAddSuccess}
+        />
+      )}
     </div>
   );
 }
 
 export default ArtistDetailsPage;
+
