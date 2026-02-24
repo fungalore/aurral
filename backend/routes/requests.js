@@ -34,7 +34,7 @@ router.get("/", noCache, async (req, res) => {
 
     const [queue, history] = await Promise.all([
       lidarrClient.getQueue().catch(() => []),
-      lidarrClient.getHistory(1, 200).catch(() => ({ records: [] })),
+      lidarrClient.getHistory({pageSize: 200}).catch(() => ({ records: [] })),
     ]);
 
     const requestsByAlbumId = new Map();

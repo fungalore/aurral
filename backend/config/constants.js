@@ -107,6 +107,8 @@ export const GENRE_KEYWORDS = [
 
 export const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const NAVIDROME_COVER_REGEX =
+  /^al-[a-zA-Z0-9_-]{22}_[a-z0-9]{8}$/i;
 
 export const MUSICBRAINZ_API = "https://musicbrainz.org/ws/2";
 export const LASTFM_API = "https://ws.audioscrobbler.com/2.0/";

@@ -605,8 +605,7 @@ export class LidarrClient {
   }
 
   async getAlbumByMbid(albumMbid) {
-    const albums = await this.request("/album");
-    return albums.find((a) => a.foreignAlbumId === albumMbid);
+    return await this.request(`/album?foreignAlbumId=${encodeURIComponent(albumMbid)}`);
   }
 
   async updateAlbum(albumId, updates) {
@@ -638,8 +637,31 @@ export class LidarrClient {
     });
   }
 
-  async getQueue() {
-    const response = await this.request("/queue");
+  async getQueue(
+    {
+      page = 1,
+      pageSize = 20,
+      sortKey = "date",
+      sortDirection = "descending",
+      includeArtist = false,
+      includeAlbum = false,
+      includeTrack = false,
+      albumId = "",
+      artistId = ""
+    } = {}
+  ) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      pageSize: pageSize.toString(),
+      sortKey,
+      sortDirection,
+      includeArtist,
+      includeAlbum,
+      includeTrack,
+      albumId,
+      artistId,
+    });
+    const response = await this.request(`/queue?${params.toString()}`);
     if (response && Array.isArray(response)) {
       return response;
     }
@@ -651,28 +673,38 @@ export class LidarrClient {
   }
 
   async getHistory(
-    page = 1,
-    pageSize = 20,
-    sortKey = "date",
-    sortDirection = "descending",
+    {
+      page = 1,
+      pageSize = 20,
+      sortKey = "date",
+      sortDirection = "descending",
+      includeArtist = false,
+      includeAlbum = false,
+      includeTrack = false,
+      albumId = "",
+      artistId = ""
+    } = {}
   ) {
     const params = new URLSearchParams({
       page: page.toString(),
       pageSize: pageSize.toString(),
       sortKey,
       sortDirection,
+      includeArtist,
+      includeAlbum,
+      includeTrack,
+      albumId,
+      artistId,
     });
     return this.request(`/history?${params.toString()}`);
   }
 
   async getHistoryForAlbum(albumId) {
-    const history = await this.getHistory(1, 100);
-    return history.records?.filter((h) => h.albumId === albumId) || [];
+    return await this.getHistory({pageSize: 100, albumId}).records || [];
   }
 
   async getHistoryForArtist(artistId) {
-    const history = await this.getHistory(1, 100);
-    return history.records?.filter((h) => h.artistId === artistId) || [];
+    return await this.getHistory({pageSize: 100, artistId}).records || [];
   }
 
   async deleteArtist(artistId, deleteFiles = false) {

@@ -1,18 +1,57 @@
 import axios from "axios";
-import { UUID_REGEX } from "../../../config/constants.js";
+import { UUID_REGEX, NAVIDROME_COVER_REGEX } from "../../../config/constants.js";
 import {
   musicbrainzRequest,
   deezerGetAlbumTracks,
 } from "../../../services/apiClients.js";
 import { dbOps } from "../../../config/db-helpers.js";
+import { NavidromeClient } from "../../../services/navidrome.js";
 
 export default function registerReleaseGroup(router) {
   router.get("/release-group/:mbid/cover", async (req, res) => {
     try {
       const { mbid } = req.params;
 
-      if (!UUID_REGEX.test(mbid)) {
+      const isUUID = UUID_REGEX.test(mbid);
+      const isNavidromeCover = NAVIDROME_COVER_REGEX.test(mbid);
+      
+      if (!isUUID && !isNavidromeCover) {
         return res.status(400).json({ error: "Invalid MBID format", images: [] });
+      }
+
+      // Build navidrome cover URL and skip db caching
+      if (isNavidromeCover) {
+        try {
+          const settings = dbOps.getSettings();
+          const navidromeConfig = settings.integrations?.navidrome || {};
+          let navidromeClient = null;
+          if (
+            navidromeConfig.url &&
+            navidromeConfig.username &&
+            navidromeConfig.password
+          ) {
+            navidromeClient = new NavidromeClient(
+              navidromeConfig.url,
+              navidromeConfig.username,
+              navidromeConfig.password
+            );
+          } else {
+            return res.json([]);
+          }
+
+          const imageUrl = await navidromeClient.getCoverArtURL(mbid);
+          return res.json({
+            images: [
+              { image: imageUrl, front: true, types: ["Front"] },
+            ],
+          });
+        } catch (e) {
+          console.log(
+            `[Cover Route] Navidrome error for ${mbid}:`,
+            e.message
+          );
+          return res.json([]);
+        }
       }
 
       const cacheKey = `rg:${mbid}`;

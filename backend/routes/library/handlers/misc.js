@@ -1,6 +1,8 @@
 import { UUID_REGEX } from "../../../config/constants.js";
 import { libraryManager } from "../../../services/libraryManager.js";
 import { qualityManager } from "../../../services/qualityManager.js";
+import { dbOps } from "../../../config/db-helpers.js";
+import { NavidromeClient } from "../../../services/navidrome.js";
 
 export default function registerMisc(router) {
   router.post("/scan", async (req, res) => {
@@ -126,57 +128,68 @@ export default function registerMisc(router) {
         return res.json([]);
       }
 
-      const [artists, albums] = await Promise.all([
-        lidarrClient.request("/artist"),
-        lidarrClient.request("/album"),
-      ]);
-
-      if (!Array.isArray(albums) || albums.length === 0) {
+      const settings = dbOps.getSettings();
+      const navidromeConfig = settings.integrations?.navidrome || {};
+      let navidromeClient = null;
+      if (
+        navidromeConfig.url &&
+        navidromeConfig.username &&
+        navidromeConfig.password
+      ) {
+        navidromeClient = new NavidromeClient(
+          navidromeConfig.url,
+          navidromeConfig.username,
+          navidromeConfig.password
+        );
+      } else {
         return res.json([]);
       }
+
+      const [artists, navidromeAlbums, navidromeArtists] = await Promise.all([
+        lidarrClient.request("/artist"),
+        navidromeClient.getAlbumList("newest", 6),
+        navidromeClient.getArtistList(),
+      ]);
 
       const artistsById = new Map();
       if (Array.isArray(artists)) {
         artists.forEach((artist) => {
-          if (artist?.id != null) {
-            artistsById.set(artist.id, artist);
+          if (artist?.foreignArtistId != null) {
+            artistsById.set(artist.foreignArtistId, artist);
           }
         });
       }
 
-      const now = Date.now();
-      const recentCutoff = now - 90 * 24 * 60 * 60 * 1000;
+      const navidromeArtistsById = new Map();
+      if (Array.isArray(navidromeArtists)) {
+        navidromeArtists.forEach((artist) => {
+          if (artist?.id != null) {
+            navidromeArtistsById.set(artist.id, artist);
+          }
+        });
+      }
 
-      const recentMissing = albums
-        .map((album) => {
-          const artist = artistsById.get(album.artistId);
-          if (!artist) return null;
-          const mapped = libraryManager.mapLidarrAlbum(album, artist);
-          const releaseDate = mapped.releaseDate || album.releaseDate || null;
-          if (!releaseDate) return null;
-          const releaseTime = new Date(releaseDate).getTime();
-          if (!releaseTime || releaseTime < recentCutoff) return null;
-          const percent = mapped.statistics?.percentOfTracks || 0;
-          const size = mapped.statistics?.sizeOnDisk || 0;
-          if (percent > 0 || size > 0) return null;
+      console.log("Navidrome recent albums:", navidromeAlbums[0]);
+      const recent = navidromeAlbums.map((album) => {
+        const navidromeArtist = navidromeArtistsById.get(album.artistId);
+        if (!navidromeArtist) {
+          console.log('Failed to find', album);
+          return null;
+        } else {
           return {
-            ...mapped,
-            artistName:
-              mapped.artistName || artist.artistName || artist.name || null,
-            artistMbid: artist.foreignArtistId || artist.mbid || null,
-            foreignArtistId: artist.foreignArtistId || artist.mbid || null,
-          };
-        })
-        .filter(Boolean)
-        .sort((a, b) => {
-          const dateA = a.releaseDate || "";
-          const dateB = b.releaseDate || "";
-          return dateB.localeCompare(dateA);
-        })
-        .slice(0, 24);
+            artistName: album.displayArtist,
+            artistMbid: navidromeArtist?.musicBrainzId || null,
+            foreignArtistId: navidromeArtist?.musicBrainzId || null,
+            albumName: album.name,
+            mbid: album.musicBrainzId || null,
+            foreignAlbumId: album.musicBrainzId || null,
+            navidromeCoverArtId: album.coverArt || null,
+          }
+        }
+      });        
 
       res.set("Cache-Control", "public, max-age=300");
-      res.json(recentMissing);
+      res.json(recent);
     } catch (error) {
       res.status(500).json({
         error: "Failed to fetch recent releases",

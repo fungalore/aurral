@@ -57,6 +57,29 @@ export class NavidromeClient {
     return this.request("ping");
   }
 
+  async getAlbumList(type = "newest", size = 10) {
+    const data = await this.request("getAlbumList", {
+      type,
+      size,
+    });
+    const albums = data.albumList?.album || [];
+    return Array.isArray(albums) ? albums : [albums];
+  }
+
+  async getArtistList() {
+    const data = await this.request("getArtists");
+    const artists = data.artists.index.map((entry) => entry.artist).flat();
+    return artists || [];
+  }
+
+  async getCoverArtURL(id) {
+    const params = new URLSearchParams({
+      ...this.getAuthParams(),
+      id,
+    });
+    return `${this.url}/rest/getCoverArt?${params.toString()}`
+  }
+
   async findSong(title, artist) {
     const data = await this.request("search3", {
       query: `${artist} ${title}`,

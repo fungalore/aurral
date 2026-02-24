@@ -224,7 +224,7 @@ export default function registerDownloads(router) {
         try {
           const [queue, history, commands] = await Promise.all([
             lidarrClient.getQueue(),
-            lidarrClient.getHistory(1, 200),
+            lidarrClient.getHistory({pageSize: 200}),
             lidarrClient.request("/command").catch(() => []),
           ]);
           const queueItems = Array.isArray(queue) ? queue : queue.records || [];
@@ -444,10 +444,9 @@ export default function registerDownloads(router) {
 
       if (lidarrClient.isConfigured()) {
         try {
-          const [queue, history, albums, commands] = await Promise.all([
+          const [queue, history, commands] = await Promise.all([
             lidarrClient.getQueue(),
-            lidarrClient.getHistory(1, 200),
-            lidarrClient.request("/album"),
+            lidarrClient.getHistory({pageSize: 200}),
             lidarrClient.request("/command").catch(() => []),
           ]);
 
@@ -455,7 +454,6 @@ export default function registerDownloads(router) {
           const historyItems = Array.isArray(history)
             ? history
             : history.records || [];
-          const allAlbums = Array.isArray(albums) ? albums : [];
           const commandItems = Array.isArray(commands)
             ? commands
             : commands?.records || [];
@@ -509,11 +507,8 @@ export default function registerDownloads(router) {
             }
           }
 
-          for (const album of allAlbums) {
-            const lidarrAlbumId = album?.id;
-            if (lidarrAlbumId == null) continue;
-            const queueItem = queueByAlbumId.get(lidarrAlbumId);
-
+          queueByAlbumId.forEach((q, albumId) => {
+            const queueItem = q;
             if (queueItem) {
               const queueStatus = String(queueItem.status || "").toLowerCase();
               const title = String(queueItem.title || "").toLowerCase();
@@ -558,13 +553,13 @@ export default function registerDownloads(router) {
                 const progress = size
                   ? Math.round((1 - sizeLeft / size) * 100)
                   : 0;
-                allStatuses[String(lidarrAlbumId)] = {
+                allStatuses[String(albumId)] = {
                   status: "downloading",
                   progress: progress,
                   updatedAt: new Date().toISOString(),
                 };
               } else if (isExplicitFailure) {
-                allStatuses[String(lidarrAlbumId)] = {
+                allStatuses[String(albumId)] = {
                   status: "failed",
                   updatedAt: new Date().toISOString(),
                 };
@@ -572,24 +567,24 @@ export default function registerDownloads(router) {
                 const progress = size
                   ? Math.round((1 - sizeLeft / size) * 100)
                   : 0;
-                allStatuses[String(lidarrAlbumId)] = {
+                allStatuses[String(albumId)] = {
                   status: "downloading",
                   progress: progress,
                   updatedAt: new Date().toISOString(),
                 };
               }
-              continue;
             }
+          });
 
-            if (searchingAlbumIds.has(lidarrAlbumId)) {
-              allStatuses[String(lidarrAlbumId)] = {
-                status: "searching",
-                updatedAt: new Date().toISOString(),
-              };
-              continue;
-            }
+          searchingAlbumIds.forEach((albumId) => {
+            allStatuses[String(albumId)] = {
+              status: "searching",
+              updatedAt: new Date().toISOString(),
+            };
+          });
 
-            const historyEntry = historyByAlbumId.get(lidarrAlbumId);
+          historyByAlbumId.forEach((entry, albumId) => {
+            const historyEntry = entry;
             const recentHistory = historyEntry?.history;
             const historyTime = historyEntry?.historyTime ?? 0;
 
@@ -643,7 +638,7 @@ export default function registerDownloads(router) {
               const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
               if (historyDate.getTime() > oneHourAgo) {
-                allStatuses[String(lidarrAlbumId)] = {
+                allStatuses[String(albumId)] = {
                   status: isComplete
                     ? "added"
                     : isFailedImport || isFailedDownload || isStaleGrabbed
@@ -651,10 +646,9 @@ export default function registerDownloads(router) {
                       : "processing",
                   updatedAt: new Date().toISOString(),
                 };
-                continue;
               }
             }
-          }
+          });
         } catch (error) {
           console.warn("Failed to fetch Lidarr status:", error.message);
         }

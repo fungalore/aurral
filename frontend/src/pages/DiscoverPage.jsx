@@ -166,7 +166,7 @@ ArtistCard.propTypes = {
 
 const AlbumCard = memo(
   ({ album, releaseCovers, artistCovers, onNavigate }) => {
-    const coverId = album.mbid || album.foreignAlbumId;
+    const coverId = album.navidromeCoverArtId || album.mbid || album.foreignAlbumId;
     const releaseCover = coverId ? releaseCovers[coverId] : null;
     const artistId = album.artistMbid || album.foreignArtistId;
     const artistCover = artistId ? artistCovers[artistId] : null;
@@ -382,7 +382,7 @@ function DiscoverPage() {
 
   useEffect(() => {
     const ids = recentReleases
-      .map((album) => album.mbid || album.foreignAlbumId)
+      .map((album) => album.navidromeCoverArtId || album.mbid || album.foreignAlbumId)
       .filter(Boolean);
     const missing = ids.filter(
       (id) => !releaseCovers[id] && !requestedReleaseCoversRef.current.has(id),
